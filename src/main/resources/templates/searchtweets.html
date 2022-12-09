@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>Search for Tweets</title>
+  <meta charset="utf-8">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <title>Twitter App Input | Template</title>
+  <meta name="description" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!--<link rel="manifest" href="site.webmanifest">-->
+  <link rel="shortcut icon" type="image/x-icon" th:href="@{/assets/img/favicon.ico}">
+
+  <!-- CSS here -->
+  <link rel="stylesheet" th:href="@{/assets/css/bootstrap.min.css}">
+  <link rel="stylesheet" th:href="@{/assets/css/owl.carousel.min.css}">
+  <link rel="stylesheet" th:href="@{/assets/css/slicknav.css}">
+  <link rel="stylesheet" th:href="@{/assets/css/flaticon.css}">
+  <link rel="stylesheet" th:href="@{/assets/css/progressbar_barfiller.css}">
+  <link rel="stylesheet" th:href="@{/assets/css/gijgo.css}">
+  <link rel="stylesheet" th:href="@{/assets/css/animate.min.css}">
+  <link rel="stylesheet" th:href="@{/assets/css/animated-headline.css}">
+  <link rel="stylesheet" th:href="@{/assets/css/magnific-popup.css}">
+  <link rel="stylesheet" th:href="@{/assets/css/fontawesome-all.min.css}">
+  <link rel="stylesheet" th:href="@{/assets/css/themify-icons.css}">
+  <link rel="stylesheet" th:href="@{/assets/css/slick.css}">
+  <link rel="stylesheet" th:href="@{/assets/css/nice-select.css}">
+  <link rel="stylesheet" th:href="@{/assets/css/style.css}">
+</head>
+<style>
+    .button-style {
+        margin: 0;
+        font-family: inherit;
+        font-size: inherit;
+        line-height: inherit;
+        background: #11E276;
+        margin-right: 16px;
+    }
+    .footer {
+       position: relative;
+       left: 0;
+       bottom: 0;
+       width: 100%;
+       background-color: red;
+       color: white;
+       text-align: center;
+    }
+</style>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<body>
+<script>
+    $(document).ready(function(){
+
+    <!--Global variable-->
+    var keepPolling = "true";
+    var searchParams = new URLSearchParams(window.location.search);
+    var email = searchParams.get('user');
+
+        <!--search click start-->
+        $("#search_id").click(function(e){
+            keepPolling = "true";
+            initializeAndSearchFirst();
+            pollServerForMatchingTweets();
+            $("#search_result_id").show();
+            $("#secondaryBtns").show();
+            //e.preventDefault();
+        });
+        <!--search click end-->
+        <!--initialize client and search for first batch-->
+        function initializeAndSearchFirst(){
+            var keywords = $("#keywords").val();
+            const words = {
+                "keywords" : keywords,
+                "user" : email
+            }
+            $.ajax({
+                type: "POST",
+                url: '/api/user/twitter/search/by/keywords',
+                data: words,
+                //dataType: "json",
+                success: function(data) {
+                    $("#search_result_id").show();
+                    addResult(data);
+                    //pollServerForMatchingTweets();
+                },
+                complete: function(){
+                    //pollServerForMatchingTweets();
+                },
+                failure: function(){
+                    alert("Invalid inputs!");
+                }
+            }).fail(function(jqXHR, textStatus, err) {
+                console.log(err)
+                alert("Something went wrong!");
+            });
+        }
+        <!--initialize client and search for first batch-->
+
+        <!--polling start-->
+        function pollServerForMatchingTweets() {
+           var keywords = $("#keywords").val();
+            const words = {
+                "keywords" : keywords,
+                "user" : email
+            }
+            $.ajax({
+                type: "POST",
+                url: '/api/user/twitter/search/by/keywords/polling',
+                data: words,
+                //dataType: "json",
+                success: function(data) {
+                    //alert('Keyword to search.' + keywords + ' response: ' + data);
+                    $("#search_result_id").show();
+                    <!--here comes web flux akka streaming in picture...-->
+                    addResult(data);
+                },
+                complete: function(){
+                    if(keepPolling == "true"){
+                        var set = setTimeout(pollServerForMatchingTweets, 3000);  //timeout 1 sec
+                    } else {
+                        return;
+                    }
+                    //addResult(data);
+                    //alert('fetched first batch of records!'); //alert after data polled
+                },
+                failure: function(){
+                    alert("Invalid inputs!");
+                }
+            }).fail(function(jqXHR, textStatus, err) {
+                if (jqXHR.responseJSON) {
+                    // handle JSON
+                    alert('json object: ' + jqXHR);
+                } else {
+                    // handle html
+                    alert('html object: ' + jqXHR);
+                }
+                console.log(err)
+                alert("Something went wrong!");
+            });
+        }
+        <!--polling end-->
+        function addResult(data) {
+            $.each(data, function(key,value) {
+              $('<p >' + value + '<br></p>').appendTo('#data_div_id');
+            });
+        }
+
+        <!--stop polling button click-->
+            $("#stopBtn").click(stopSearch);
+            $("#stopBtn-2").click(stopSearch);
+            function stopSearch(e){
+                keepPolling = "false";
+                //alert('Polling stopped!');
+                e.preventDefault();
+            }
+        <!--stop polling button click-->
+        <!--clear search div - end-->
+        $('#clearBtn').click(clearSearch);
+        $('#clearBtn-2').click(clearSearch);
+        function clearSearch(e){
+            $("#data_div_id").empty();
+            $("#secondaryBtns").hide();
+            fadeOutSecondaryButtons();
+        }
+        function fadeOutSecondaryButtons(){
+            $("#secondaryBtns").delay(4000).fadeIn();
+        }
+        <!--clear search div - end-->
+
+    });
+</script>
+<!-- ? Preloader Start -->
+<div id="preloader-active">
+  <div class="preloader d-flex align-items-center justify-content-center">
+    <div class="preloader-inner position-relative">
+      <div class="preloader-circle"></div>
+      <div class="preloader-img pere-text">
+        <img th:src="@{/assets/img/logo/loder.png}" alt="">
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Preloader Start -->
+<!--<header>
+    &lt;!&ndash; Header Start &ndash;&gt;
+    <div class="header-area header-transparent">
+        <div class="main-header ">
+            <div class="header-bottom  header-sticky">
+                <div class="container-fluid">
+                    <div class="row align-items-center">
+                        &lt;!&ndash; Logo &ndash;&gt;
+                        <div class="col-xl-2 col-lg-2">
+                            <div class="logo">
+                                <a href="index.html"><img src="assets/img/logo/logo.png" alt=""></a>
+                            </div>
+                        </div>
+                        <div class="col-xl-10 col-lg-10">
+                            <div class="menu-wrapper  d-flex align-items-center justify-content-end">
+                                &lt;!&ndash; Main-menu &ndash;&gt;
+                                <div class="main-menu d-none d-lg-block">
+                                    <nav>
+                                        <ul id="navigation">
+                                            <li><a href="index.html">Home</a></li>
+                                            <li><a href="categori.html">Categories</a></li>
+                                            <li><a href="#">Pages</a>
+                                                <ul class="submenu">
+                                                    <li><a href="about.html">about</a></li>
+                                                    <li><a href="blog.html">Blog</a></li>
+                                                    <li><a href="blog_details.html">Blog Details</a></li>
+                                                    <li><a href="elements.html">Element</a></li>
+                                                </ul>
+                                            </li>
+                                            <li><a href="login.html">Log in</a></li>
+                                        </ul>
+                                    </nav>
+                                </div>
+                                &lt;!&ndash; Header-btn &ndash;&gt;
+                                <div class="header-right-btn d-none d-lg-block ml-65">
+                                    <a href="contact.html" class="border-btn">Post a Job</a>
+                                </div>
+                            </div>
+                        </div>
+                        &lt;!&ndash; Mobile Menu &ndash;&gt;
+                        <div class="col-12">
+                            <div class="mobile_menu d-block d-lg-none"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    &lt;!&ndash; Header End &ndash;&gt;
+</header>
+&lt;!&ndash; header end &ndash;&gt;-->
+<!-- ? Preloader Start -->
+
+<main>
+  <!-- Hero Area Start-->
+  <div class="slider-area">
+    <div class="single-slider slider-height d-flex align-items-center">
+      <div class="container">
+        <div class="row justify-content-center">
+          <div id="step2" class="col-xl-11 col-lg-12" >
+            <div class="hero__caption">
+              <p>2. Search for tweets using keywords.</p>
+            </div>
+            <form action="" id="keywordForm_id" class="search-box">
+              <div class="input-form">
+                <input type="text" id="keywords" placeholder="Keywords" required>
+                <!-- icon -->
+                <div class="icon">
+                  <i class="fas fa-pencil-alt"></i>
+                </div>
+              </div>
+              <div class="select-form">
+                <div class="select-itms">
+                  <select name="select" id="select1">
+                    <option value="">Mix Search</option>
+                    <option value="">Sports</option>
+                    <option value="">Politics</option>
+                    <option value="">Entertainment</option>
+                    <option value="">Technology</option>
+                  </select>
+                </div>
+              </div>
+              <div class="search-form-2">
+                <!--<a href=""><i class="fas fa-search"></i> Search</a>-->
+                <button type="button" id="search_id" class="search-form-2">Search</button>
+              </div>
+            </form>
+          </div>
+
+          <!--search result-->
+          <div id="search_result_id" style="display:none">
+            <h1>here comes web flux akka streaming in picture...no streaming will do by pollling</h1>
+            <button type="button" id="stopBtn" class="button-style">Stop</button>
+            <button type="button" id="clearBtn" class="button-style">Clear search result</button>
+            <div id="data_div_id">
+              <!--result div-->
+            </div>
+          </div>
+          <div id="secondaryBtns" class="col-lg-12" style="display:none">
+            <button type="button" id="stopBtn-2" class="button-style">Stop2</button>
+            <button type="button" id="clearBtn-2" class="button-style">Clear search result2</button>
+          </div>
+          <div class="col-lg-12">
+            <div class="popular-search text-center pt-30">
+              <ul>
+                <li><p>Popular search:</p></li>
+                <li><a href="#">#coming soon...</a></li>
+                <li><a href="#">#coming soon...</a></li>
+                <li><a href="#">#Programmer</a></li>
+                <li><a href="#">#Finance</a></li>
+                <li><a href="#">#UI designer</a></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- JS here -->
+<script th:src="@{/assets/js/vendor/modernizr-3.5.0.min.js}"></script>
+<!-- Jquery, Popper, Bootstrap -->
+<script th:src="@{/assets/js/vendor/jquery-1.12.4.min.js}"></script>
+<script th:src="@{/assets/js/popper.min.js}"></script>
+<script th:src="@{/assets/js/bootstrap.min.js}"></script>
+<!-- Jquery Mobile Menu -->
+<script th:src="@{/assets/js/jquery.slicknav.min.js}"></script>
+
+<!-- Jquery Slick , Owl-Carousel Plugins -->
+<script th:src="@{/assets/js/owl.carousel.min.js}"></script>
+<script th:src="@{/assets/js/slick.min.js}"></script>
+<!-- One Page, Animated-HeadLin -->
+<script th:src="@{/assets/js/wow.min.js}"></script>
+<script th:src="@{/assets/js/animated.headline.js}"></script>
+<script th:src="@{/assets/js/jquery.magnific-popup.js}"></script>
+
+<!-- Date Picker -->
+<script th:src="@{/assets/js/gijgo.min.js}"></script>
+<!-- Nice-select, sticky -->
+<script th:src="@{/assets/js/jquery.nice-select.min.js}"></script>
+<script th:src="@{/assets/js/jquery.sticky.js}"></script>
+<!-- Progress -->
+<script th:src="@{/assets/js/jquery.barfiller.js}"></script>
+
+<!-- counter , waypoint,Hover Direction -->
+<script th:src="@{/assets/js/jquery.counterup.min.js}"></script>
+<script th:src="@{/assets/js/waypoints.min.js}"></script>
+<script th:src="@{/assets/js/jquery.countdown.min.js}"></script>
+<script th:src="@{/assets/js/hover-direction-snake.min.js}"></script>
+
+<!-- contact js -->
+<script th:src="@{/assets/js/contact.js}"></script>
+<script th:src="@{/assets/js/jquery.form.js}"></script>
+<script th:src="@{/assets/js/jquery.validate.min.js}"></script>
+<script th:src="@{/assets/js/mail-script.js}"></script>
+<script th:src="@{/assets/js/jquery.ajaxchimp.min.js}"></script>
+
+<!-- Jquery Plugins, main Jquery -->
+<script th:src="@{/assets/js/plugins.js}"></script>
+<script th:src="@{/assets/js/main.js}"></script>
+
+</body>
+</html>
