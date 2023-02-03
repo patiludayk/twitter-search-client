@@ -14,12 +14,10 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -42,17 +40,22 @@ public class SearchServiceImpl {
 
     private ObjectMapper objectMapper;
 
+    private KafkaTemplate<String, String> kafkaTemplate;
+
+    @Value(value = "${twitter.kafka.topic:twitter}")
+    private String twitterTopic;
+
     @Autowired
-    public SearchServiceImpl(TwitterRepository twitterRepository, TwitterClientProvider twitterClientProvider) {
+    public SearchServiceImpl(TwitterRepository twitterRepository, TwitterClientProvider twitterClientProvider, KafkaTemplate<String, String> kafkaTemplate) {
         this.twitterRepository = twitterRepository;
         this.twitterClientProvider = twitterClientProvider;
-        objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        this.kafkaTemplate = kafkaTemplate;
+        objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                .configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true);
     }
 
-    public boolean createClientAndStartProducingTweetsToTopic(Keywords keywords, BlockingQueue<String> msgQueue) {
-        Map<String, Object> userSecrets = twitterRepository.findUserSecrets(keywords.getUser());
-        objectMapper.configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true);
-        Secrets secrets = objectMapper.convertValue(userSecrets, Secrets.class);
+    public boolean createTwitterClientAndGetTweets(Keywords keywords, BlockingQueue<String> msgQueue) {
+        Secrets secrets = getUserSecrets(keywords);
 
         // keywords to search
         List<String> terms = getTerms(keywords.getKeywords());
@@ -60,10 +63,19 @@ public class SearchServiceImpl {
         // make sure you close same client otherwise there will be resource leak
         ClientTweets client = twitterClientProvider.getClient(secrets, terms);
 
-        client.setProducer(getProducerForUserTweets());
+        //client.setProducer(getProducerForUserTweets());
 
         client.getClient().connect();
+
         return startProducingTweetsToTopic(client);
+    }
+
+    private Secrets getUserSecrets(Keywords keywords) {
+        //TODO: not good have authentication inplace get user details from there.
+        //1. call database service using feign client to get secrets based on username
+        Map<String, Object> userSecrets = twitterRepository.findUserSecrets(keywords.getUser());
+        Secrets secrets = objectMapper.convertValue(userSecrets, Secrets.class);
+        return secrets;
     }
 
     public List<String> getTweetsForKeywords(Keywords keywords) {
@@ -91,17 +103,13 @@ public class SearchServiceImpl {
                 return false;
             }
             if (msg != null) {
-                client.getProducer().send(new ProducerRecord<String, String>("topic-tweets", "tweets", msg), (recordMetadata, e) -> {
-                    if (e != null) {
-                        log.error("Something went wrong in producer.", e);
-                    }
-                });
+                kafkaTemplate.send(twitterTopic, msg);
             }
         }
         return true;
     }
 
-    private KafkaProducer<String, String> getProducerForUserTweets() {
+/*    private KafkaProducer<String, String> getProducerForUserTweets() {
 
         String bootstrapServers = "localhost:9092";
 
@@ -124,7 +132,7 @@ public class SearchServiceImpl {
 
         // create producer
         return new KafkaProducer<String, String>(producerProps);
-    }
+    }*/
 
     public static KafkaConsumer<String, String> createConsumer(String topic) {
 

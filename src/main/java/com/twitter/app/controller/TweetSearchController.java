@@ -24,6 +24,7 @@ public class TweetSearchController {
         this.searchService = searchService;
     }
 
+    //TODO: implement authentication here as we require user authentication to get tweeter secrets from repository.
     @PostMapping("search")
     public ResponseEntity searchTwitterForKeywords(Keywords keywords) {
         List<String> tweets = null;
